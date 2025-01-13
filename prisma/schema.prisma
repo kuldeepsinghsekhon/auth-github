@@ -18,6 +18,10 @@ model User {
   accounts      Account[]
   Authenticator Authenticator[]
   sessions      Session[]
+  password      String?
+  twoFactorEnabled    Boolean  @default(false)
+  twoFactorSecret     String?
+  backupCodes     String? 
 }
 
 

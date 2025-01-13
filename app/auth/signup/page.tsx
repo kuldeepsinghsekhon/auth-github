@@ -35,7 +35,7 @@ export default function SignUpPage() {
       setError(null)
 
       await axios.post('/api/auth/signup', data)
-      router.push('/login?success=Account created successfully')
+      router.push('/auth/new-user?success=Account created successfully')
     } catch (err) {
       if (axios.isAxiosError(err)) {
         setError(err.response?.data?.error || 'Something went wrong')
@@ -54,7 +54,7 @@ export default function SignUpPage() {
           <h1 className="text-2xl font-bold">Create an Account</h1>
           <p className="mt-2 text-sm text-gray-600">
             Already have an account?{' '}
-            <Link href="/login" className="text-indigo-600 hover:text-indigo-500">
+            <Link href="/auth/signin" className="text-indigo-600 hover:text-indigo-500">
               Sign in
             </Link>
           </p>
