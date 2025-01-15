@@ -87,15 +87,30 @@ export const authOptions: NextAuthOptions = {
     //   session.user.id = user.id
     //   return session
     // },
-    async signIn({ user }) {
-      if (user.twoFactorEnabled) {
-        // Implement 2FA verification flow
-        const verified = verifyToken(user.twoFactorSecret, token)
-        if (!verified) {
-          return false
-        }
+    async signIn({ user, account }) {
+      // Skip 2FA for OAuth providers
+      if (account?.provider !== 'credentials') {
+        return true
       }
-      return true
+
+      // Check if user has 2FA enabled
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.id }
+      })
+
+      if (!dbUser?.twoFactorEnabled) {
+        return true
+      }
+          // Store user ID in session for 2FA verification
+      return `/auth/verify-2fa?userId=${user.id}`
+      // if (user.twoFactorEnabled) {
+      //   // Implement 2FA verification flow
+      //   const verified = verifyToken(user.twoFactorSecret, token)
+      //   if (!verified) {
+      //     return false
+      //   }
+      // }
+      // return true
     },
      session:async ({ session, user }) => ({
       ...session,

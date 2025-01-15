@@ -14,6 +14,13 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'chart.googleapis.com',
+        pathname: '/chart/**',
+      },
+    ],
     unoptimized: true,
   },
   experimental: {

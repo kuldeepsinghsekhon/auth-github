@@ -6,7 +6,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import axios from 'axios'
-
+import Image from 'next/image'
+import QRCode from 'qrcode'
 const profileSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
@@ -24,6 +25,13 @@ const passwordSchema = z.object({
 export default function ProfilePage() {
   const { data: session, update } = useSession()
   const [sessions, setSessions] = useState([])
+  const [qrCode, setQrCode] = useState<string | null>(null)
+  const [isQrError, setIsQrError] = useState(false)
+  const [qrCodeSvg, setQrCodeSvg] = useState<string>('')
+  const [secret, setSecret] = useState<string | null>(null)
+  const [verificationCode, setVerificationCode] = useState('')
+  const [backupCodes, setBackupCodes] = useState<string[]>([])
+  const [error, setError] = useState<string | null>(null)
   const [is2FAEnabled, setIs2FAEnabled] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -67,14 +75,50 @@ export default function ProfilePage() {
     try {
       setLoading(true)
       const response = await axios.post('/api/user/2fa/toggle')
-      setIs2FAEnabled(response.data.enabled)
+      setQrCode(response.data.qrcode)
+      console.log(response.data)
+        //setIs2FAEnabled(response.data.enabled)
+        const otpauth_url = `otpauth://totp/Codersgit:${session?.user?.email}?secret=${response.data.secret}&issuer=Codersgit`
+        await generateQR(otpauth_url)
     } catch (error) {
-      console.error(error)
+      setError('Failed to initialize 2FA')
     } finally {
       setLoading(false)
     }
   }
-
+  const generateQR = async (otpauth_url: string) => {
+    try {
+      const svg = await QRCode.toString(otpauth_url, {
+        type: 'svg',
+        width: 256,
+        errorCorrectionLevel: 'L'
+      })
+      setQrCodeSvg(svg)
+    } catch (err) {
+      setError('Failed to generate QR code')
+    }
+  }
+  const verify2FA = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await axios.post('/api/user/2fa/verify', {
+        token: verificationCode
+      })
+      
+      if (response.data.backupCodes) {
+        setBackupCodes(response.data.backupCodes)
+        //setBackupCodes(true)
+      }
+      setIs2FAEnabled(true)
+      setQrCode(null)
+      setSecret(null)
+    } catch (err) {
+      setError('Invalid verification code')
+    } finally {
+      setLoading(false)
+    }
+  }
   const logoutAllDevices = async () => {
     try {
       setLoading(true)
@@ -158,15 +202,81 @@ export default function ProfilePage() {
       {/* 2FA Section */}
       <section className="bg-white p-6 rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">Two-Factor Authentication</h2>
+
+
+        {!is2FAEnabled && !qrCode && (
         <button
           onClick={toggle2FA}
           disabled={loading}
-          className={`px-4 py-2 rounded-md ${
-            is2FAEnabled ? 'bg-red-600' : 'bg-green-600'
-          } text-white`}
+          className="bg-blue-600 text-white px-4 py-2 rounded-md"
         >
-          {is2FAEnabled ? 'Disable 2FA' : 'Enable 2FA'}
+          {loading ? 'Setting up...' : 'Enable 2FA'}
         </button>
+      )}
+
+{qrCode && (
+        <div className="space-y-4">
+          <div className="relative w-48 h-48 mx-auto bg-white p-4 rounded-lg shadow">
+          <p className="text-sm text-center text-gray-600">
+            Scan this QR code with your authenticator app
+          </p>
+          <div 
+            className="w-64 h-64 mx-auto"
+            dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
+          />
+       
+              {isQrError && (
+              <div className="absolute inset-0 flex items-center justify-center text-red-500">
+                Failed to load QR code
+              </div>
+            )}
+          </div>
+          <p className="text-sm text-gray-600">
+            Or enter this code manually: <code>{secret}</code>
+          </p>
+          <div className="space-y-2">
+            <input
+              type="text"
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value)}
+              placeholder="Enter verification code"
+              className="w-full p-2 border rounded"
+            />
+            <button
+              onClick={verify2FA}
+              disabled={loading || !verificationCode}
+              className="w-full bg-green-600 text-white px-4 py-2 rounded-md"
+            >
+              {loading ? 'Verifying...' : 'Verify and Enable'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <p className="text-red-600 text-sm">{error}</p>
+      )}
+
+      {backupCodes.length > 0 && (
+        <div className="space-y-4 bg-yellow-50 p-4 rounded-md">
+          <h3 className="font-medium">Backup Codes</h3>
+          <p className="text-sm text-yellow-800">
+            Save these backup codes in a secure place. They can be used to access your account if you lose your authenticator device.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {backupCodes.map((code, i) => (
+              <code key={i} className="bg-white p-2 rounded text-sm">{code}</code>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {is2FAEnabled && (
+        <div className="text-green-600">
+          ✓ Two-factor authentication is enabled
+        </div>
+      )}
+
       </section>
 
       {/* Session Management */}

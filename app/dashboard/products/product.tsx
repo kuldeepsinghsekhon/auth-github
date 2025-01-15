@@ -1,3 +1,7 @@
+import { useState } from "react"
+import { deleteProduct, updateProduct } from "@/actions/product"
+import {DeleteDialog,EditDialog} from './product-dialog'
+import { toast } from "sonner"
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,12 +14,28 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
-import { SelectProduct } from '@/lib/products';
-import { deleteProduct } from './actions';
+import { type Product } from "@prisma/client";
 
-export function Product({ product }: { product: SelectProduct }) {
+export function Product({ product }: { product: Product }) {
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  const handleDelete = async () => {
+    setLoading(true)
+    try {
+      await deleteProduct(product.id)
+      toast.success("Product deleted successfully")
+    } catch (error) {
+      toast.error("Failed to delete product")
+    } finally {
+      setLoading(false)
+      setDeleteOpen(false)
+    }
+  }
   return (
     <TableRow>
+      
       <TableCell className="hidden sm:table-cell">
         <Image
           alt="Product image"
@@ -46,15 +66,28 @@ export function Product({ product }: { product: SelectProduct }) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem>Edit</DropdownMenuItem>
-            <DropdownMenuItem>
-              <form action={deleteProduct}>
-                <button type="submit">Delete</button>
-              </form>
+            <DropdownMenuItem onClick={() => setEditOpen(true)}>
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setDeleteOpen(true)}>
+              Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>
+      <DeleteDialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={handleDelete}
+        loading={loading}
+      />
+
+      <EditDialog
+        product={product}
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onConfirm={updateProduct.bind(null, product.id)}
+      />
     </TableRow>
   );
 }
