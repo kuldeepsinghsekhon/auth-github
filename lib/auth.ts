@@ -1,35 +1,113 @@
-import { getServerSession } from "next-auth"
+
 import NextAuth from "next-auth"
 import { NextAuthOptions } from "next-auth"
-import GithubProvider from "next-auth/providers/github"
-import CredentialsProvider from "next-auth/providers/credentials"
-import { PrismaAdapter } from "@next-auth/prisma-adapter"
+import Apple from "next-auth/providers/apple"
+import EmailProvider from "next-auth/providers/email";
+import Credentials from "next-auth/providers/credentials"
+import Email from "next-auth/providers/email"
+import Auth0 from "next-auth/providers/auth0"
+import AzureB2C from "next-auth/providers/azure-ad-b2c"
+import BankIDNorway from "next-auth/providers/bankid-no"
+import BoxyHQSAML from "next-auth/providers/boxyhq-saml"
+import Cognito from "next-auth/providers/cognito"
+import Coinbase from "next-auth/providers/coinbase"
+import Discord from "next-auth/providers/discord"
+import Dropbox from "next-auth/providers/dropbox"
+import Facebook from "next-auth/providers/facebook"
+import GitHub from "next-auth/providers/github"
+import GitLab from "next-auth/providers/gitlab"
+import Google from "next-auth/providers/google"
+import Hubspot from "next-auth/providers/hubspot"
+import Keycloak from "next-auth/providers/keycloak"
+import LinkedIn from "next-auth/providers/linkedin"
+import MicrosoftEntraId from "next-auth/providers/microsoft-entra-id"
+import Netlify from "next-auth/providers/netlify"
+import Okta from "next-auth/providers/okta"
+import Passage from "next-auth/providers/passage"
+import Passkey from "next-auth/providers/passkey"
+import Pinterest from "next-auth/providers/pinterest"
+import Reddit from "next-auth/providers/reddit"
+import Slack from "next-auth/providers/slack"
+import Salesforce from "next-auth/providers/salesforce"
+import Spotify from "next-auth/providers/spotify"
+import Twitch from "next-auth/providers/twitch"
+import Twitter from "next-auth/providers/twitter"
+import Vipps from "next-auth/providers/vipps"
+import WorkOS from "next-auth/providers/workos"
+import Zoom from "next-auth/providers/zoom"
+
+import { PrismaAdapter } from "@auth/prisma-adapter"
 import { PrismaClient } from "@prisma/client"
+
 import bcrypt from 'bcryptjs'
-import EmailProvider from "next-auth/providers/email"
 import { createTransport } from "nodemailer"
 import { verifyToken } from 'node-2fa'
 const prisma = new PrismaClient()
 
-export const authOptions: NextAuthOptions = {
+export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
+
   providers: [
-    GithubProvider({
-      clientId: process.env.GITHUB_ID!,
-      clientSecret: process.env.GITHUB_SECRET!,
-    }),
-    EmailProvider({
-      server: {
-        host: process.env.EMAIL_SERVER_HOST,
-        port: Number(process.env.EMAIL_SERVER_PORT),
-        auth: {
-          user: process.env.EMAIL_SERVER_USER,
-          pass: process.env.EMAIL_SERVER_PASSWORD,
+    
+    Apple,
+    // Atlassian,
+    //Auth0,
+    //AzureB2C,
+    //BankIDNorway,
+    // BoxyHQSAML({
+    //   clientId: "dummy",
+    //   clientSecret: "dummy",
+    //   issuer: process.env.AUTH_BOXYHQ_SAML_ISSUER,
+    // }),
+    // Cognito,
+    // Coinbase,
+    // Discord,
+    // Dropbox,
+    // Facebook,
+    GitHub,
+    // GitLab,
+    Google,
+    // Hubspot,
+    // Keycloak({ name: "Keycloak (bob/bob)" }),
+    // LinkedIn,
+    // MicrosoftEntraId,
+    // Netlify,
+    // Okta,
+    Passkey({
+      formFields: {
+        email: {
+          label: "Username",
+          required: true,
+          autocomplete: "username webauthn",
         },
       },
-      from: process.env.EMAIL_FROM,
     }),
-    CredentialsProvider({
+    // Passage,
+    // Pinterest,
+    // Reddit,
+    // Salesforce,
+    // Slack,
+    // Spotify,
+    // Twitch,
+    // Twitter,
+    // Vipps({
+    //   issuer: "https://apitest.vipps.no/access-management-1.0/access/",
+    // }),
+    // WorkOS({ connection: process.env.AUTH_WORKOS_CONNECTION! }),
+     Zoom,
+     
+    // EmailProvider({
+    //   server: {
+    //     host: process.env.EMAIL_SERVER_HOST,
+    //     port: Number(process.env.EMAIL_SERVER_PORT),
+    //     auth: {
+    //       user: process.env.EMAIL_SERVER_USER,
+    //       pass: process.env.EMAIL_SERVER_PASSWORD,
+    //     },
+    //   },
+    //   from: process.env.EMAIL_FROM,
+    // }),
+    Credentials({
       name: 'Credentials',
       credentials: {
         email: { label: "Email", type: "email" },
@@ -50,6 +128,7 @@ export const authOptions: NextAuthOptions = {
             email: true,
             emailVerified: true,
             image: true,
+            role: true,
             createdAt: true,
             updatedAt: true,
             password: true
@@ -73,11 +152,12 @@ export const authOptions: NextAuthOptions = {
       }
     })
   ],
+  basePath: "/auth",
   session: {
     strategy: "jwt"
   },
   pages: {
-    signIn: '/login',
+    signIn: '/auth/signin',
    // signOut: '/logout',
     verifyRequest: '/auth/verify-request',
     newUser: '/auth/new-user',
@@ -97,7 +177,7 @@ export const authOptions: NextAuthOptions = {
       const dbUser = await prisma.user.findUnique({
         where: { id: user.id }
       })
-
+      console.log('dbUser',dbUser)
       if (!dbUser?.twoFactorEnabled) {
         return true
       }
@@ -112,50 +192,33 @@ export const authOptions: NextAuthOptions = {
       // }
       // return true
     },
-     session:async ({ session, user }) => ({
-      ...session,
-      user: {
-        ...session.user,
-        id: user.id,
-      },
-    }),
+    //  session:async ({ session, user }) => ({
+    //   ...session,
+    //   user: {
+    //     ...session.user,
+    //     id: user.id,
+    //   },
+    // }),
 
-    async session({ token, session }) {
-      if (token) {
-        session.user.id = token.id
-        session.user.name = token.name
-        session.user.email = token.email
-        session.user.image = token.picture
+    async session({ session, token }) {
+      console.log('======session======',session)
+      console.log('========token=====',token)
+      if (session.user) {
+        session.user.role = token.role
       }
+      console.log('======session with role======',session)
       return session
     },
     async jwt({ token, user }) {
-      const dbUser = await prisma.user.findFirst({
-        where: {
-          email: token.email,
-        },
-      })
-
-      if (!dbUser) {
-        if (user) {
-          token.id = user?.id
-        }
-        return token
+      console.log('mmuser',user)
+      console.log('jwttoken',token)
+      if (user) {
+        token.role = user.role
       }
-
-      return {
-        id: dbUser.id,
-        name: dbUser.name,
-        email: dbUser.email,
-        picture: dbUser.image
-      }
+      return token
      }
   }
-}
+})
 
-const handler = NextAuth(authOptions)
-export { handler as GET, handler as POST }
-
-export const getAuthSession = () => getServerSession(authOptions)
-export { signOut as handleSignOut } from "next-auth/react"
+export { signOut as handleSignOut } 
 
